@@ -31,6 +31,8 @@ jobs:
               """Generate name from directory path: infrastructure/traefik/default -> infrastructure-traefik-default"""
               # Get path relative to repo root, excluding docker-compose.yml
               rel_path = os.path.dirname(filepath)
+              # Remove leading ./ if present
+              rel_path = rel_path.lstrip('./')
               # Replace / with - to create name
               return rel_path.replace('/', '-').replace('\\', '-')
 
