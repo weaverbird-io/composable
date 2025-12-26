@@ -16,5 +16,7 @@ if [ -n "$MQTT_USER" ] && [ -n "$MQTT_PASSWORD" ]; then
     # Use docker to run mosquitto_passwd
     docker run --rm -v "$(pwd)/config:/config" eclipse-mosquitto:2 \
         mosquitto_passwd -b -c /config/passwd "$MQTT_USER" "$MQTT_PASSWORD"
+    # Make readable by mosquitto user (UID 1883 in container)
+    chmod 644 config/passwd
     echo "Created MQTT password file for user: $MQTT_USER"
 fi
