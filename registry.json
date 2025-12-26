@@ -18,17 +18,16 @@
       "requires": ["infrastructure-networks-default"],
       "env_vars": ["ACME_EMAIL", "TRAEFIK_DASHBOARD_DOMAIN"],
       "files": ["docker-compose.yml", ".env.example"]
-    }
-  ],
-  "services": [
+    },
     {
-      "name": "services-mqtt-default",
-      "path": "services/mqtt/default",
+      "name": "infrastructure-mqtt-default",
+      "path": "infrastructure/mqtt/default",
       "description": "Eclipse Mosquitto MQTT broker with TLS via Traefik",
       "ports": [],
       "requires": ["infrastructure-traefik-default"],
       "env_vars": ["MQTT_DOMAIN", "MQTT_USER", "MQTT_PASSWORD"],
       "files": ["docker-compose.yml", ".env.example", "config/mosquitto.conf"]
     }
-  ]
+  ],
+  "services": []
 }

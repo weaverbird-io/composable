@@ -1,4 +1,4 @@
-name: services-mqtt-default
+name: infrastructure-mqtt-default
 
 services:
   mqtt:
