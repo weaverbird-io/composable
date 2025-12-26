@@ -76,10 +76,10 @@
     {
       "name": "infrastructure-mailinabox-default",
       "path": "infrastructure/mailinabox/default",
-      "description": "Mail-in-a-Box in LXD container (dedicated mail server)",
-      "ports": [25, 465, 587, 993, 443, 80, 53],
-      "requires": [],
-      "env_vars": ["MIAB_HOSTNAME", "MIAB_EMAIL", "MIAB_CONTAINER_NAME"],
+      "description": "Mail-in-a-Box in LXD container with Traefik integration",
+      "ports": [25, 465, 587, 993],
+      "requires": ["infrastructure-traefik-default"],
+      "env_vars": ["MIAB_HOSTNAME", "MIAB_EMAIL", "MIAB_CONTAINER_NAME", "MIAB_STATIC_IP"],
       "files": ["docker-compose.yml", ".env.example"]
     }
   ],
