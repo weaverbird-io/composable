@@ -1,0 +1,34 @@
+name: services-mqtt-default
+
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: mqtt
+    restart: unless-stopped
+    volumes:
+      - ./config:/mosquitto/config:ro
+      - mqtt_data:/mosquitto/data
+      - mqtt_log:/mosquitto/log
+    networks:
+      - infra-public
+    labels:
+      - "traefik.enable=true"
+      # MQTT TCP routing (plain)
+      - "traefik.tcp.routers.mqtt.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.mqtt.entrypoints=mqtt"
+      - "traefik.tcp.routers.mqtt.service=mqtt"
+      - "traefik.tcp.services.mqtt.loadbalancer.server.port=1883"
+      # MQTT TLS routing
+      - "traefik.tcp.routers.mqtts.rule=HostSNI(`${MQTT_DOMAIN}`)"
+      - "traefik.tcp.routers.mqtts.entrypoints=mqtts"
+      - "traefik.tcp.routers.mqtts.tls.certresolver=letsencrypt"
+      - "traefik.tcp.routers.mqtts.service=mqtts"
+      - "traefik.tcp.services.mqtts.loadbalancer.server.port=1883"
+
+networks:
+  infra-public:
+    external: true
+
+volumes:
+  mqtt_data:
+  mqtt_log:
