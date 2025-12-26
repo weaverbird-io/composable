@@ -1,0 +1,18 @@
+name: infrastructure-mailinabox-default
+
+# Mail-in-a-Box requires a dedicated machine/container
+# This stack uses LXD to create an isolated container
+#
+# The docker-compose here is just a placeholder
+# Actual setup is done via setup.sh which creates an LXD container
+
+services:
+  mailinabox-info:
+    image: busybox
+    container_name: mailinabox-info
+    command: ["sh", "-c", "echo 'Mail-in-a-Box runs in LXD container. See setup.sh' && exit 0"]
+    restart: "no"
+
+# After running setup.sh:
+#   - LXD container 'mailinabox' will be created
+#   - Access admin at: https://<MIAB_DOMAIN>/admin

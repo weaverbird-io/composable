@@ -63,6 +63,24 @@
       "requires": ["infrastructure-networks-default"],
       "env_vars": ["WG_SERVER_URL", "WG_PORT", "WG_PEERS", "WG_DNS"],
       "files": ["docker-compose.yml", ".env.example"]
+    },
+    {
+      "name": "infrastructure-mailcow-default",
+      "path": "infrastructure/mailcow/default",
+      "description": "Mailcow full email server (Postfix, Dovecot, SOGo, Rspamd)",
+      "ports": [25, 465, 587, 143, 993, 110, 995, 4190],
+      "requires": ["infrastructure-networks-default"],
+      "env_vars": ["MAILCOW_HOSTNAME", "MAILCOW_TZ"],
+      "files": ["docker-compose.yml", ".env.example"]
+    },
+    {
+      "name": "infrastructure-mailinabox-default",
+      "path": "infrastructure/mailinabox/default",
+      "description": "Mail-in-a-Box in LXD container (dedicated mail server)",
+      "ports": [25, 465, 587, 993, 443, 80, 53],
+      "requires": [],
+      "env_vars": ["MIAB_HOSTNAME", "MIAB_EMAIL", "MIAB_CONTAINER_NAME"],
+      "files": ["docker-compose.yml", ".env.example"]
     }
   ],
   "services": []
