@@ -108,7 +108,7 @@ http:
     mailinabox:
       loadBalancer:
         servers:
-          - url: "https://${MIAB_STATIC_IP}"
+          - url: "https://mailinabox"
         serversTransport: miab-transport
 
   serversTransports:
