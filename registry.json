@@ -20,6 +20,15 @@
       "files": ["docker-compose.yml", ".env.example"]
     },
     {
+      "name": "infrastructure-vault-default",
+      "path": "infrastructure/vault/default",
+      "description": "HashiCorp Vault for secrets management",
+      "ports": [],
+      "requires": ["infrastructure-traefik-default"],
+      "env_vars": ["VAULT_DOMAIN"],
+      "files": ["docker-compose.yml", ".env.example", "config/vault.hcl"]
+    },
+    {
       "name": "infrastructure-mqtt-default",
       "path": "infrastructure/mqtt/default",
       "description": "Eclipse Mosquitto MQTT broker with TLS via Traefik",
@@ -27,6 +36,33 @@
       "requires": ["infrastructure-traefik-default"],
       "env_vars": ["MQTT_DOMAIN", "MQTT_USER", "MQTT_PASSWORD"],
       "files": ["docker-compose.yml", ".env.example", "config/mosquitto.conf"]
+    },
+    {
+      "name": "infrastructure-mailpit-default",
+      "path": "infrastructure/mailpit/default",
+      "description": "Email testing server with web UI",
+      "ports": [],
+      "requires": ["infrastructure-traefik-default"],
+      "env_vars": ["MAILPIT_DOMAIN"],
+      "files": ["docker-compose.yml", ".env.example"]
+    },
+    {
+      "name": "infrastructure-rabbitmq-default",
+      "path": "infrastructure/rabbitmq/default",
+      "description": "RabbitMQ message broker with management UI",
+      "ports": [],
+      "requires": ["infrastructure-traefik-default"],
+      "env_vars": ["RABBITMQ_DOMAIN", "RABBITMQ_USER", "RABBITMQ_PASSWORD"],
+      "files": ["docker-compose.yml", ".env.example"]
+    },
+    {
+      "name": "infrastructure-wireguard-default",
+      "path": "infrastructure/wireguard/default",
+      "description": "WireGuard VPN server",
+      "ports": [51820],
+      "requires": ["infrastructure-networks-default"],
+      "env_vars": ["WG_SERVER_URL", "WG_PORT", "WG_PEERS", "WG_DNS"],
+      "files": ["docker-compose.yml", ".env.example"]
     }
   ],
   "services": []

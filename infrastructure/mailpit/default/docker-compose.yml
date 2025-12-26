@@ -1,0 +1,32 @@
+name: infrastructure-mailpit-default
+
+services:
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: unless-stopped
+    environment:
+      - MP_SMTP_AUTH_ACCEPT_ANY=true
+      - MP_SMTP_AUTH_ALLOW_INSECURE=true
+    volumes:
+      - mailpit_data:/data
+    networks:
+      - infra-public
+    labels:
+      - "traefik.enable=true"
+      # Web UI
+      - "traefik.http.routers.mailpit.rule=Host(`${MAILPIT_DOMAIN}`)"
+      - "traefik.http.routers.mailpit.entrypoints=websecure"
+      - "traefik.http.routers.mailpit.tls.certresolver=letsencrypt"
+      - "traefik.http.services.mailpit.loadbalancer.server.port=8025"
+      # SMTP - internal only via docker network
+      - "traefik.tcp.routers.mailpit-smtp.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.mailpit-smtp.entrypoints=smtp"
+      - "traefik.tcp.services.mailpit-smtp.loadbalancer.server.port=1025"
+
+networks:
+  infra-public:
+    external: true
+
+volumes:
+  mailpit_data:
