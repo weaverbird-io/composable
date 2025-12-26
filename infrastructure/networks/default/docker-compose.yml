@@ -1,0 +1,17 @@
+name: infrastructure-networks-default
+
+networks:
+  infra-public:
+    driver: bridge
+    name: infra-public
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+  infra-private:
+    driver: bridge
+    name: infra-private
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+    internal: true

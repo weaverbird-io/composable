@@ -1,0 +1,28 @@
+name: infrastructure-traefik-default
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "1883:1883"   # MQTT
+      - "8883:8883"   # MQTT TLS
+    environment:
+      - CF_API_EMAIL=${CF_API_EMAIL}
+      - CF_API_KEY=${CF_API_KEY}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./acme.json:/acme.json
+      - ./config:/etc/traefik/config:ro
+    networks:
+      - infra-public
+
+networks:
+  infra-public:
+    external: true

@@ -1,0 +1,228 @@
+name: Validate Docker Compose Files
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate and fix compose names
+        run: |
+          python3 << 'EOF'
+          import os
+          import yaml
+          import sys
+
+          def get_expected_name(filepath):
+              """Generate name from directory path: infrastructure/traefik/default -> infrastructure-traefik-default"""
+              # Get path relative to repo root, excluding docker-compose.yml
+              rel_path = os.path.dirname(filepath)
+              # Replace / with - to create name
+              return rel_path.replace('/', '-').replace('\\', '-')
+
+          def find_compose_files():
+              """Find all docker-compose.yml files"""
+              compose_files = []
+              for root, dirs, files in os.walk('.'):
+                  # Skip hidden directories
+                  dirs[:] = [d for d in dirs if not d.startswith('.')]
+                  for f in files:
+                      if f == 'docker-compose.yml' or f.startswith('docker-compose.') and f.endswith('.yml'):
+                          compose_files.append(os.path.join(root, f))
+              return compose_files
+
+          def validate_compose(filepath):
+              """Validate a compose file has correct name field"""
+              with open(filepath, 'r') as f:
+                  try:
+                      content = yaml.safe_load(f)
+                  except yaml.YAMLError as e:
+                      return False, f"Invalid YAML: {e}"
+
+              if content is None:
+                  return False, "Empty file"
+
+              # Check for deprecated version field
+              if 'version' in content:
+                  return False, "Contains deprecated 'version' field - please remove it"
+
+              # Check for name field
+              if 'name' not in content:
+                  return False, "Missing 'name' field"
+
+              expected_name = get_expected_name(filepath)
+              actual_name = content.get('name', '')
+
+              if actual_name != expected_name:
+                  return False, f"Name mismatch: expected '{expected_name}', got '{actual_name}'"
+
+              return True, "OK"
+
+          def main():
+              compose_files = find_compose_files()
+              print(f"Found {len(compose_files)} docker-compose file(s)\n")
+
+              errors = []
+              names_seen = {}
+
+              for filepath in compose_files:
+                  print(f"Checking: {filepath}")
+                  valid, message = validate_compose(filepath)
+
+                  if valid:
+                      print(f"  ✓ {message}")
+                      # Check for duplicate names
+                      with open(filepath, 'r') as f:
+                          content = yaml.safe_load(f)
+                      name = content.get('name', '')
+                      if name in names_seen:
+                          errors.append(f"{filepath}: Duplicate name '{name}' (also in {names_seen[name]})")
+                          print(f"  ✗ Duplicate name")
+                      else:
+                          names_seen[name] = filepath
+                  else:
+                      print(f"  ✗ {message}")
+                      errors.append(f"{filepath}: {message}")
+
+              print()
+              if errors:
+                  print("Errors found:")
+                  for error in errors:
+                      print(f"  - {error}")
+                  sys.exit(1)
+              else:
+                  print("All compose files are valid!")
+                  sys.exit(0)
+
+          if __name__ == '__main__':
+              main()
+          EOF
+
+      - name: Update registry.json
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          python3 << 'EOF'
+          import os
+          import json
+          import yaml
+
+          def find_compose_files():
+              compose_files = []
+              for root, dirs, files in os.walk('.'):
+                  dirs[:] = [d for d in dirs if not d.startswith('.')]
+                  for f in files:
+                      if f == 'docker-compose.yml':
+                          compose_files.append(os.path.join(root, f))
+              return compose_files
+
+          def parse_compose(filepath):
+              with open(filepath, 'r') as f:
+                  content = yaml.safe_load(f)
+
+              rel_path = os.path.dirname(filepath).lstrip('./')
+              name = content.get('name', '')
+
+              # Determine category from path
+              if rel_path.startswith('infrastructure/'):
+                  category = 'infrastructure'
+              elif rel_path.startswith('services/'):
+                  category = 'services'
+              else:
+                  return None
+
+              # Get ports from compose
+              ports = []
+              if 'services' in content:
+                  for svc in content['services'].values():
+                      if 'ports' in svc:
+                          for port in svc['ports']:
+                              if isinstance(port, str) and ':' in port:
+                                  ports.append(int(port.split(':')[0]))
+                              elif isinstance(port, int):
+                                  ports.append(port)
+
+              # Check for README
+              readme_path = os.path.join(os.path.dirname(filepath), 'README.md')
+              description = ""
+              if os.path.exists(readme_path):
+                  with open(readme_path, 'r') as f:
+                      lines = f.readlines()
+                      for line in lines[1:]:  # Skip title
+                          line = line.strip()
+                          if line and not line.startswith('#'):
+                              description = line
+                              break
+
+              # Get env vars from .env.example
+              env_vars = []
+              env_example = os.path.join(os.path.dirname(filepath), '.env.example')
+              if os.path.exists(env_example):
+                  with open(env_example, 'r') as f:
+                      for line in f:
+                          line = line.strip()
+                          if line and not line.startswith('#') and '=' in line:
+                              env_vars.append(line.split('=')[0])
+
+              return {
+                  'category': category,
+                  'entry': {
+                      'name': name,
+                      'path': rel_path,
+                      'description': description,
+                      'ports': sorted(set(ports)),
+                      'requires': [],
+                      'env_vars': env_vars
+                  }
+              }
+
+          def main():
+              registry = {
+                  'version': '1.0.0',
+                  'infrastructure': [],
+                  'services': []
+              }
+
+              compose_files = find_compose_files()
+
+              for filepath in compose_files:
+                  result = parse_compose(filepath)
+                  if result:
+                      registry[result['category']].append(result['entry'])
+
+              # Sort by name
+              registry['infrastructure'].sort(key=lambda x: x['name'])
+              registry['services'].sort(key=lambda x: x['name'])
+
+              with open('registry.json', 'w') as f:
+                  json.dump(registry, f, indent=2)
+
+              print("Registry updated!")
+              print(f"  Infrastructure: {len(registry['infrastructure'])}")
+              print(f"  Services: {len(registry['services'])}")
+
+          if __name__ == '__main__':
+              main()
+          EOF
+
+      - name: Commit registry changes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add registry.json
+          git diff --staged --quiet || git commit -m "Update registry.json [skip ci]"
+          git push || echo "Nothing to push"
