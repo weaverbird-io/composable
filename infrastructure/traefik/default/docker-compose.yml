@@ -2,7 +2,7 @@ name: infrastructure-traefik-default
 
 services:
   traefik:
-    image: traefik:v3.0
+    image: traefik:latest
     container_name: traefik
     restart: unless-stopped
     security_opt:
@@ -12,21 +12,53 @@ services:
       - "443:443"
       - "1883:1883"   # MQTT
       - "8883:8883"   # MQTT TLS
-    environment:
-      - ACME_EMAIL=${ACME_EMAIL}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data:/data
+      - ./config:/etc/traefik/config:ro
+    networks:
+      - infra-public
+    command:
+      # API and dashboard
+      - --api.dashboard=true
+      - --api.insecure=false
+
+      # Logging
+      - --log.level=INFO
+
+      # Docker provider
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=infra-public
+
+      # File provider for dynamic config
+      - --providers.file.directory=/etc/traefik/config
+      - --providers.file.watch=true
+
+      # Entrypoints
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.mqtt.address=:1883
+      - --entrypoints.mqtts.address=:8883
+
+      # HTTP to HTTPS redirect
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+
+      # Let's Encrypt
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
+
+      # Security
+      - --global.sendAnonymousUsage=false
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_DASHBOARD_DOMAIN}`)"
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.routers.dashboard.service=api@internal"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./acme.json:/acme.json
-      - ./config:/etc/traefik/config:ro
-    networks:
-      - infra-public
 
 networks:
   infra-public:
