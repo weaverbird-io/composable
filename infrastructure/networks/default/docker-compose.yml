@@ -1,5 +1,15 @@
 name: infrastructure-networks-default
 
+services:
+  # Dummy service to trigger network creation
+  # Runs once and exits - networks persist
+  init:
+    image: busybox:latest
+    command: ["true"]
+    networks:
+      - infra-public
+      - infra-private
+
 networks:
   infra-public:
     driver: bridge
