@@ -19,8 +19,10 @@ Reverse proxy with automatic HTTPS via Cloudflare DNS challenge.
 
 Copy `.env.example` to `.env` and configure:
 
-- `CF_API_EMAIL` - Your Cloudflare account email
-- `CF_API_KEY` - Cloudflare API key (or API token with DNS edit permission)
+- `ACME_EMAIL` - Email for Let's Encrypt certificate registration
+- `CF_DNS_API_TOKEN` - Cloudflare API token with DNS edit permissions
+  - Create at: Cloudflare Dashboard → Profile → API Tokens
+  - Use template: "Edit zone DNS" and select your zones
 
 ## Usage
 

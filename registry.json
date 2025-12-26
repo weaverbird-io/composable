@@ -15,7 +15,7 @@
       "description": "Reverse proxy with automatic HTTPS (Cloudflare DNS)",
       "ports": [80, 443, 1883, 8883],
       "requires": ["infrastructure-networks-default"],
-      "env_vars": ["CF_API_EMAIL", "CF_API_KEY"]
+      "env_vars": ["ACME_EMAIL", "CF_DNS_API_TOKEN"]
     }
   ],
   "services": []
