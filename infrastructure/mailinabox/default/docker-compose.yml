@@ -1,18 +1,35 @@
 name: infrastructure-mailinabox-default
 
-# Mail-in-a-Box requires a dedicated machine/container
-# This stack uses LXD to create an isolated container
-#
-# The docker-compose here is just a placeholder
-# Actual setup is done via setup.sh which creates an LXD container
+# Mail-in-a-Box runs in LXD container, not Docker
+# This container provides status visibility in the TUI
 
 services:
-  mailinabox-info:
-    image: busybox
-    container_name: mailinabox-info
-    command: ["sh", "-c", "echo 'Mail-in-a-Box runs in LXD container. See setup.sh' && exit 0"]
-    restart: "no"
+  mailinabox-status:
+    image: alpine:latest
+    container_name: mailinabox-status
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - |
+        echo "Mail-in-a-Box Status Monitor"
+        echo "MIAB runs in LXD container: mailinabox"
+        echo "Use 'sudo lxc exec mailinabox -- bash' to access"
+        while true; do
+          sleep 3600
+        done
+    labels:
+      - "infra.type=lxd-monitor"
+      - "infra.lxd.container=mailinabox"
 
-# After running setup.sh:
-#   - LXD container 'mailinabox' will be created
-#   - Access admin at: https://<MIAB_DOMAIN>/admin
+# Note: The actual MIAB runs in LXD container 'mailinabox'
+# This Docker container just provides status visibility in the TUI
+#
+# LXD container management:
+#   sudo lxc exec mailinabox -- bash   # Shell access
+#   sudo lxc stop mailinabox           # Stop
+#   sudo lxc start mailinabox          # Start
+#
+# Web access (via Traefik):
+#   Admin: https://<MIAB_HOSTNAME>/admin
+#   Webmail: https://<MIAB_HOSTNAME>/mail
