@@ -103,6 +103,10 @@ sleep 10
 ACTUAL_IP=$(sudo lxc list "$CONTAINER_NAME" -c 4 --format csv | cut -d' ' -f1)
 echo "Container IP: $ACTUAL_IP"
 
+# Create .lxd marker file for infra-cli to detect LXD-based stack
+echo "$CONTAINER_NAME" > .lxd
+echo "Created .lxd marker file"
+
 # Step 7: Configure port proxies for mail ports (Traefik handles 80/443)
 echo "[6/9] Configuring mail port proxies..."
 sudo lxc config device add "$CONTAINER_NAME" smtp proxy \
