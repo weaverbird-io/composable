@@ -129,14 +129,14 @@ services:
         condition: service_started
     networks:
       - erpnext
-      - infra
+      - infra-public
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.erpnext.rule=Host(`${SITE_NAME}`)"
       - "traefik.http.routers.erpnext.entrypoints=websecure"
       - "traefik.http.routers.erpnext.tls.certresolver=letsencrypt"
       - "traefik.http.services.erpnext.loadbalancer.server.port=8080"
-      - "traefik.docker.network=infra"
+      - "traefik.docker.network=infra-public"
 
   # WebSocket - Real-time communication
   websocket:
@@ -188,5 +188,5 @@ volumes:
 networks:
   erpnext:
     driver: bridge
-  infra:
+  infra-public:
     external: true
