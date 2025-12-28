@@ -42,7 +42,7 @@ fi
 
 # Install Helpdesk
 echo ""
-echo "[3/5] Installing Helpdesk..."
+echo "[3/6] Installing Helpdesk..."
 if docker exec erpnext-backend bench --site "$SITE_DOMAIN" list-apps | grep -q "helpdesk"; then
     echo "Helpdesk already installed"
 else
@@ -52,14 +52,26 @@ else
     }
 fi
 
+# Install Kenya Compliance (eTIMS)
+echo ""
+echo "[4/6] Installing Kenya Compliance (eTIMS)..."
+if docker exec erpnext-backend bench --site "$SITE_DOMAIN" list-apps | grep -q "kenya_compliance"; then
+    echo "Kenya Compliance already installed"
+else
+    docker exec erpnext-backend bench --site "$SITE_DOMAIN" install-app kenya_compliance || {
+        echo "WARNING: Kenya Compliance installation failed. Make sure you built the custom image."
+        echo "Run: ./build.sh"
+    }
+fi
+
 # Clear cache
 echo ""
-echo "[4/5] Clearing cache..."
+echo "[5/6] Clearing cache..."
 docker exec erpnext-backend bench --site "$SITE_DOMAIN" clear-cache
 
 # Migrate
 echo ""
-echo "[5/5] Running migrations..."
+echo "[6/6] Running migrations..."
 docker exec erpnext-backend bench --site "$SITE_DOMAIN" migrate
 
 echo ""

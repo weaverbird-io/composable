@@ -4,9 +4,10 @@ Open-source ERP system built on the Frappe framework with HR, Helpdesk, and Inve
 
 ## Included Modules
 
-- **ERPNext Core** - Accounting, CRM, Projects, Stock/Inventory
+- **ERPNext Core** - Accounting, CRM, Projects, Stock/Inventory, Manufacturing
 - **HRMS** - Human Resources, Payroll, Attendance, Leave Management
 - **Helpdesk** - Support Tickets, SLA Management, Customer Portal
+- **Kenya Compliance** - KRA eTIMS integration for tax compliance
 
 ## Quick Start (Basic Setup)
 
@@ -111,6 +112,12 @@ After installation, configure modules in ERPNext:
 - Go to **Support > Support Settings**
 - Configure SLA: **Support > Service Level Agreement**
 - Create Issue Types: **Support > Issue Type**
+
+### eTIMS Kenya (KRA Compliance)
+- Go to **Kenya Compliance > eTIMS Settings**
+- Set Environment: Sandbox (testing) or Production
+- Configure your KRA credentials
+- Enable auto-submission of invoices
 
 ## Maintenance Commands
 
