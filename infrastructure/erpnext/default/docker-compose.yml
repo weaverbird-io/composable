@@ -1,7 +1,7 @@
 name: infrastructure-erpnext-default
 
 x-erpnext-image: &erpnext_image
-  image: frappe/erpnext:${ERPNEXT_VERSION:-v15}
+  image: ${ERPNEXT_IMAGE:-frappe/erpnext}:${ERPNEXT_VERSION:-v15}
   platform: linux/amd64
 
 x-depends-on-configurator: &depends_on_configurator
