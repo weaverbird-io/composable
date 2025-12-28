@@ -1,10 +1,22 @@
 name: infrastructure-vault-default
 
 services:
+  vault-init:
+    image: hashicorp/vault:latest
+    container_name: vault-init
+    user: root
+    volumes:
+      - vault_data:/vault/data
+    entrypoint: ["/bin/sh", "-c", "chown -R vault:vault /vault/data && echo 'Permissions fixed'"]
+    restart: "no"
+
   vault:
     image: hashicorp/vault:latest
     container_name: vault
     restart: unless-stopped
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
     cap_add:
       - IPC_LOCK
     environment:

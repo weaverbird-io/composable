@@ -197,15 +197,45 @@ fi
 # Step 9: Start services and configure web
 echo "[8/9] Starting services..."
 
-# Start management daemon directly (avoid systemctl issues in LXD)
+# Create startup script for MIAB services (runs on container boot)
+sudo lxc exec "$CONTAINER_NAME" -- bash -c 'cat > /usr/local/bin/miab-start.sh << "STARTSCRIPT"
+#!/bin/bash
+# MIAB startup script - runs on container boot
+# Needed because systemd does not work properly in LXD
+
+sleep 5  # Wait for network
+
+# Start management daemon if not running
+if ! pgrep -f "gunicorn.*wsgi:app" > /dev/null; then
+    source /usr/local/lib/mailinabox/env/bin/activate
+    mkdir -p /var/lib/mailinabox
+    if [ ! -f /var/lib/mailinabox/api.key ]; then
+        tr -cd "[:xdigit:]" < /dev/urandom | head -c 32 > /var/lib/mailinabox/api.key
+        chmod 640 /var/lib/mailinabox/api.key
+    fi
+    export PYTHONPATH=/root/mailinabox/management
+    cd /root/mailinabox/management
+    nohup gunicorn -b localhost:10222 -w 1 --timeout 630 wsgi:app >> /var/log/mailinabox-daemon.log 2>&1 &
+fi
+
+# Ensure nginx is running
+service nginx start 2>/dev/null || true
+
+# Ensure postfix is running
+service postfix start 2>/dev/null || true
+
+# Ensure dovecot is running
+service dovecot start 2>/dev/null || true
+STARTSCRIPT
+chmod +x /usr/local/bin/miab-start.sh'
+
+# Add to cron @reboot for persistence across container restarts
 sudo lxc exec "$CONTAINER_NAME" -- bash -c '
-source /usr/local/lib/mailinabox/env/bin/activate
-mkdir -p /var/lib/mailinabox
-tr -cd "[:xdigit:]" < /dev/urandom | head -c 32 > /var/lib/mailinabox/api.key
-chmod 640 /var/lib/mailinabox/api.key
-export PYTHONPATH=/root/mailinabox/management
-nohup gunicorn -b localhost:10222 -w 1 --timeout 630 wsgi:app > /var/log/mailinabox-daemon.log 2>&1 &
+(crontab -l 2>/dev/null | grep -v miab-start; echo "@reboot /usr/local/bin/miab-start.sh") | crontab -
 '
+
+# Run the startup script now
+sudo lxc exec "$CONTAINER_NAME" -- /usr/local/bin/miab-start.sh
 
 sleep 5
 
