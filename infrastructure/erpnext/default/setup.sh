@@ -9,14 +9,14 @@ if [ -f .env ]; then
     source .env
 fi
 
-SITE_NAME="${SITE_NAME:-erp.example.com}"
+SITE_DOMAIN="${SITE_DOMAIN:-erp.example.com}"
 DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-changeme}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
 
 echo "=============================================="
 echo "ERPNext Site Setup"
 echo "=============================================="
-echo "Site: $SITE_NAME"
+echo "Site: $SITE_DOMAIN"
 echo "=============================================="
 
 # Wait for services to be ready
@@ -54,30 +54,30 @@ done
 
 # Check if site already exists
 echo "[3/4] Checking for existing site..."
-SITE_EXISTS=$(docker exec erpnext-backend bench --site $SITE_NAME list-apps 2>/dev/null && echo "yes" || echo "no")
+SITE_EXISTS=$(docker exec erpnext-backend bench --site $SITE_DOMAIN list-apps 2>/dev/null && echo "yes" || echo "no")
 
 if [ "$SITE_EXISTS" = "yes" ]; then
-    echo "Site $SITE_NAME already exists."
-    echo "To recreate, run: docker exec erpnext-backend bench drop-site $SITE_NAME --force"
+    echo "Site $SITE_DOMAIN already exists."
+    echo "To recreate, run: docker exec erpnext-backend bench drop-site $SITE_DOMAIN --force"
     exit 0
 fi
 
 # Create new site
 echo "[4/4] Creating ERPNext site (this takes 2-5 minutes)..."
-docker exec -e SITE_NAME="$SITE_NAME" erpnext-backend bench new-site "$SITE_NAME" \
+docker exec -e SITE_DOMAIN="$SITE_DOMAIN" erpnext-backend bench new-site "$SITE_DOMAIN" \
     --mariadb-root-password "$DB_ROOT_PASSWORD" \
     --admin-password "$ADMIN_PASSWORD" \
     --install-app erpnext
 
 # Set as default site
-docker exec erpnext-backend bench use "$SITE_NAME"
+docker exec erpnext-backend bench use "$SITE_DOMAIN"
 
 echo ""
 echo "=============================================="
 echo "ERPNext Installation Complete!"
 echo "=============================================="
 echo ""
-echo "Site: https://$SITE_NAME"
+echo "Site: https://$SITE_DOMAIN"
 echo "Username: Administrator"
 echo "Password: $ADMIN_PASSWORD"
 echo ""

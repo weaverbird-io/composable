@@ -112,7 +112,7 @@ services:
       - nginx-entrypoint.sh
     environment:
       BACKEND: backend:8000
-      FRAPPE_SITE_NAME_HEADER: ${SITE_NAME}
+      FRAPPE_SITE_NAME_HEADER: ${SITE_DOMAIN}
       SOCKETIO: websocket:9000
       UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
       UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
@@ -132,7 +132,7 @@ services:
       - infra-public
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.erpnext.rule=Host(`${SITE_NAME}`)"
+      - "traefik.http.routers.erpnext.rule=Host(`${SITE_DOMAIN}`)"
       - "traefik.http.routers.erpnext.entrypoints=websecure"
       - "traefik.http.routers.erpnext.tls.certresolver=letsencrypt"
       - "traefik.http.services.erpnext.loadbalancer.server.port=8080"
