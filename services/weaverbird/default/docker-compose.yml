@@ -1,0 +1,302 @@
+name: services-weaverbird-default
+
+services:
+  rebac-service:
+    image: ghcr.io/weaverbird-io/rebac-service:latest
+    restart: unless-stopped
+    environment:
+      REBAC_SERVER_GRPC_PORT: 50052
+      REBAC_SERVER_HTTP_PORT: 8081
+      REBAC_SERVER_METRICS_PORT: 9091
+      REBAC_SPICEDB_ENDPOINT: ${SPICEDB_HOST}:${SPICEDB_PORT}
+      REBAC_SPICEDB_TOKEN: ${SPICEDB_GRPC_PRESHARED_KEY}
+      REBAC_SPICEDB_INSECURE: "true"
+      REBAC_POSTGRES_HOST: ${POSTGRES_HOST}
+      REBAC_POSTGRES_PORT: ${POSTGRES_PORT}
+      REBAC_POSTGRES_USER: ${POSTGRES_USER}
+      REBAC_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REBAC_POSTGRES_DATABASE: ${REBAC_DATABASE}
+      REBAC_POSTGRES_SSL_MODE: ${POSTGRES_SSL_MODE}
+      REBAC_RABBITMQ_HOST: ${RABBITMQ_HOST}
+      REBAC_RABBITMQ_PORT: ${RABBITMQ_PORT}
+      REBAC_RABBITMQ_USER: ${RABBITMQ_USER}
+      REBAC_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      REBAC_RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      REBAC_REDIS_HOST: ${REDIS_HOST}
+      REBAC_REDIS_PORT: ${REDIS_PORT}
+    networks:
+      - infra-private
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8081/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  audit-service:
+    image: ghcr.io/weaverbird-io/audit-service:latest
+    restart: unless-stopped
+    environment:
+      AUDIT_HTTP_PORT: 8085
+      AUDIT_GRPC_PORT: 50055
+      AUDIT_PG_HOST: ${POSTGRES_HOST}
+      AUDIT_PG_PORT: 5432
+      AUDIT_PG_USER: ${POSTGRES_USER}
+      AUDIT_PG_PASSWORD: ${POSTGRES_PASSWORD}
+      AUDIT_PG_DATABASE: ${AUDIT_DATABASE}
+      AUDIT_PG_SSLMODE: ${POSTGRES_SSL_MODE}
+      AUDIT_RABBITMQ_HOST: ${RABBITMQ_HOST}
+      AUDIT_RABBITMQ_PORT: 5672
+      AUDIT_RABBITMQ_USER: ${RABBITMQ_USER}
+      AUDIT_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      AUDIT_RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      AUDIT_REBAC_URL: http://rebac-service:8081
+    depends_on:
+      rebac-service:
+        condition: service_healthy
+    networks:
+      - infra-private
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  notification-service:
+    image: ghcr.io/weaverbird-io/notification-service:latest
+    restart: unless-stopped
+    environment:
+      NOTIFICATION_HTTP_PORT: 8083
+      NOTIFICATION_GRPC_PORT: 50053
+      NOTIFICATION_WS_PORT: 8084
+      NOTIFICATION_PG_HOST: ${POSTGRES_HOST}
+      NOTIFICATION_PG_PORT: 5432
+      NOTIFICATION_PG_USER: ${POSTGRES_USER}
+      NOTIFICATION_PG_PASSWORD: ${POSTGRES_PASSWORD}
+      NOTIFICATION_PG_DATABASE: ${NOTIFICATION_DATABASE}
+      NOTIFICATION_PG_SSLMODE: ${POSTGRES_SSL_MODE}
+      NOTIFICATION_RABBITMQ_HOST: ${RABBITMQ_HOST}
+      NOTIFICATION_RABBITMQ_PORT: 5672
+      NOTIFICATION_RABBITMQ_USER: ${RABBITMQ_USER}
+      NOTIFICATION_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      NOTIFICATION_RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      NOTIFICATION_REBAC_URL: http://rebac-service:8081
+      NOTIFICATION_SMTP_HOST: ${NOTIFICATION_SMTP_HOST:-mailpit}
+      NOTIFICATION_SMTP_PORT: ${NOTIFICATION_SMTP_PORT:-1025}
+      NOTIFICATION_SMTP_FROM: ${NOTIFICATION_SMTP_FROM:-}
+      NOTIFICATION_SMTP_TLS: ${NOTIFICATION_SMTP_TLS:-false}
+      NOTIFICATION_SMTP_USER: ${NOTIFICATION_SMTP_USER:-}
+      NOTIFICATION_SMTP_PASSWORD: ${NOTIFICATION_SMTP_PASSWORD:-}
+      NOTIFICATION_PLATFORM_NAME: ${NOTIFICATION_PLATFORM_NAME:-WeaverBird}
+    depends_on:
+      rebac-service:
+        condition: service_healthy
+    networks:
+      - infra-private
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  credential-service:
+    image: ghcr.io/weaverbird-io/credential-service:latest
+    restart: unless-stopped
+    environment:
+      CRED_HTTP_PORT: 8086
+      CRED_GRPC_PORT: 50056
+      CRED_PG_HOST: ${POSTGRES_HOST}
+      CRED_PG_PORT: 5432
+      CRED_PG_USER: ${POSTGRES_USER}
+      CRED_PG_PASSWORD: ${POSTGRES_PASSWORD}
+      CRED_PG_DATABASE: ${CREDENTIAL_DATABASE}
+      CRED_PG_SSLMODE: ${POSTGRES_SSL_MODE}
+      CRED_VAULT_ADDR: ${VAULT_ADDR}
+      CRED_VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID}
+      CRED_RABBITMQ_HOST: ${RABBITMQ_HOST}
+      CRED_RABBITMQ_PORT: 5672
+      CRED_RABBITMQ_USER: ${RABBITMQ_USER}
+      CRED_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      CRED_RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      CRED_REBAC_URL: http://rebac-service:8081
+    depends_on:
+      rebac-service:
+        condition: service_healthy
+    networks:
+      - infra-private
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  storage-service:
+    image: ghcr.io/weaverbird-io/storage-service:latest
+    restart: unless-stopped
+    environment:
+      STORAGE_SERVER_HTTP_PORT: 8080
+      STORAGE_SERVER_GRPC_PORT: 50050
+      STORAGE_PG_HOST: ${POSTGRES_HOST}
+      STORAGE_PG_PORT: 5432
+      STORAGE_PG_USER: ${POSTGRES_USER}
+      STORAGE_PG_PASSWORD: ${POSTGRES_PASSWORD}
+      STORAGE_PG_DATABASE: ${STORAGE_DATABASE}
+      STORAGE_PG_SSLMODE: ${POSTGRES_SSL_MODE}
+      STORAGE_S3_ENDPOINT: http://seaweedfs-filer:8333
+      STORAGE_S3_ACCESS_KEY: ${SEAWEEDFS_ACCESS_KEY}
+      STORAGE_S3_SECRET_KEY: ${SEAWEEDFS_SECRET_KEY}
+      STORAGE_S3_BUCKET: ${SEAWEEDFS_BUCKET}
+      STORAGE_S3_USE_PATH_STYLE: "true"
+      STORAGE_REBAC_URL: http://rebac-service:8081
+      STORAGE_RABBITMQ_HOST: ${RABBITMQ_HOST}
+      STORAGE_RABBITMQ_PORT: 5672
+      STORAGE_RABBITMQ_USER: ${RABBITMQ_USER}
+      STORAGE_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      STORAGE_RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      STORAGE_RABBITMQ_EXCHANGE: weaverbird.events
+    depends_on:
+      rebac-service:
+        condition: service_healthy
+    networks:
+      - infra-private
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  auth-service:
+    image: ghcr.io/weaverbird-io/auth-service:latest
+    restart: unless-stopped
+    environment:
+      AUTH_SERVER_HTTP_PORT: 8080
+      AUTH_SERVER_GRPC_PORT: 50051
+      AUTH_PG_HOST: ${POSTGRES_HOST}
+      AUTH_PG_PORT: 5432
+      AUTH_PG_USER: ${POSTGRES_USER}
+      AUTH_PG_PASSWORD: ${POSTGRES_PASSWORD}
+      AUTH_PG_DATABASE: ${AUTH_DATABASE}
+      AUTH_PG_SSLMODE: ${POSTGRES_SSL_MODE}
+      AUTH_REDIS_HOST: ${REDIS_HOST}
+      AUTH_REDIS_PORT: 6379
+      AUTH_RABBITMQ_HOST: ${RABBITMQ_HOST}
+      AUTH_RABBITMQ_PORT: 5672
+      AUTH_RABBITMQ_USER: ${RABBITMQ_USER}
+      AUTH_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      AUTH_RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      AUTH_REBAC_URL: http://rebac-service:8081
+      AUTH_NOTIFY_SERVICE_URL: notification-service:50053
+      AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
+      AUTH_JWT_PUBLIC_KEY: ${AUTH_JWT_PUBLIC_KEY:-}
+      AUTH_JWT_ACCESS_TOKEN_TTL: ${AUTH_JWT_ACCESS_TOKEN_TTL:-15m}
+      AUTH_JWT_REFRESH_TOKEN_TTL: ${AUTH_JWT_REFRESH_TOKEN_TTL:-168h}
+      AUTH_STORAGE_SERVICE_URL: http://storage-service:8080
+      AUTH_STORAGE_ENABLED: "true"
+    depends_on:
+      rebac-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      storage-service:
+        condition: service_healthy
+    networks:
+      - infra-private
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  auth-frontend:
+    image: ghcr.io/weaverbird-io/auth-frontend:latest
+    restart: unless-stopped
+    environment:
+      API_URL: ${AUTH_FRONTEND_API_URL:-http://nginx:80/api}
+      GATEWAY_URL: ${AUTH_FRONTEND_GATEWAY_URL:-http://nginx:80}
+    depends_on:
+      auth-service:
+        condition: service_healthy
+    networks:
+      - infra-private
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  webhook-relay:
+    image: ghcr.io/weaverbird-io/webhook-relay:latest
+    restart: unless-stopped
+    environment:
+      HTTP_PORT: 8090
+      AUTH_PG_HOST: ${POSTGRES_HOST}
+      AUTH_PG_PORT: 5432
+      AUTH_PG_USER: ${POSTGRES_USER}
+      AUTH_PG_PASSWORD: ${POSTGRES_PASSWORD}
+      AUTH_PG_DATABASE: ${AUTH_DATABASE}
+      AUTH_PG_SSLMODE: ${POSTGRES_SSL_MODE}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      RABBITMQ_EXCHANGE: weaverbird.events
+      DELIVERY_TIMEOUT: 30s
+      DELIVERY_MAX_RETRIES: 5
+      DELIVERY_WORKERS: 10
+    networks:
+      - infra-private
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      rebac-service:
+        condition: service_healthy
+      audit-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      credential-service:
+        condition: service_healthy
+      storage-service:
+        condition: service_healthy
+      auth-frontend:
+        condition: service_healthy
+    networks:
+      - infra-private
+      - infra-public
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.weaverbird.rule=Host(`${WEAVERBIRD_DOMAIN}`)"
+      - "traefik.http.routers.weaverbird.entrypoints=websecure"
+      - "traefik.http.routers.weaverbird.tls.certresolver=letsencrypt"
+      - "traefik.http.services.weaverbird.loadbalancer.server.port=80"
+
+networks:
+  infra-private:
+    external: true
+  infra-public:
+    external: true

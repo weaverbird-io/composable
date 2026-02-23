@@ -1,0 +1,515 @@
+/**
+ * WeaverBird AIM - SpiceDB Authorization Schema
+ *
+ * This schema defines the relationship-based access control (ReBAC) model
+ * for the WeaverBird Authorization, Identity, and Management platform.
+ *
+ * Hierarchy:
+ *   system (exactly one: system:weaverbird)
+ *     └── app (registered SaaS applications)
+ *           ├── tenant (optional multi-tenant subdivision)
+ *           │     └── node (locations, departments, etc.)
+ *           │           └── node* (nested)
+ *           ├── channel (app-level channels)
+ *           └── node (locations, departments, etc.)
+ *                 ├── group (user groupings)
+ *                 │     └── channel
+ *                 ├── resource (permission anchors)
+ *                 ├── credential (vault-backed secrets)
+ *                 ├── shift (temporal access)
+ *                 ├── channel
+ *                 └── node* (nested)
+ *
+ * Key concepts:
+ * - Users are subjects, not entities
+ * - Permissions are computed from relations, never stored
+ * - Time/expiry constraints are enforced outside SpiceDB by WeaverBird
+ */
+
+// =============================================================================
+// User - Subject type (not an entity, just a subject reference)
+// =============================================================================
+definition user {
+    // Self-reference for self-service actions
+    relation self: user
+
+    // User blocking (user A blocks user B)
+    relation blocked_by: user
+
+    // User connections (mutual connection between users)
+    // To represent a connection: user:alice#connected_to@user:bob AND user:bob#connected_to@user:alice
+    relation connected_to: user
+
+    // Connection requests (pending connections)
+    // user:bob#connection_request_from@user:alice means alice sent bob a request
+    relation connection_request_from: user
+
+    // Computed permissions
+    permission deactivate_self = self           // User can deactivate their own account
+    permission is_blocked_by = blocked_by       // Check if blocked by another user
+    permission is_connected = connected_to      // Check if connected to another user
+    permission has_connection_request = connection_request_from  // Check if has pending request
+}
+
+// =============================================================================
+// System - Root of the entire graph (exactly one instance: system:weaverbird)
+// =============================================================================
+definition system {
+    // Direct relationships
+    relation owner: user                    // System owner (super admin)
+    relation admin: user                    // System administrators
+    relation member: user                   // System-level members (all platform users)
+
+    // Computed permissions
+    permission manage = owner + admin
+    permission access = member + admin + owner
+    permission view = access                // System-level view = access
+
+    // User management permissions (system-wide)
+    permission ban_user = owner + admin     // Can ban users globally
+    permission suspend_user = owner + admin // Can suspend users globally
+}
+
+// =============================================================================
+// App - A registered SaaS or application using WeaverBird
+// =============================================================================
+definition app {
+    // Parent relationship (must be system)
+    relation parent: system
+
+    // Direct relationships
+    relation owner: user                    // App owner
+    relation admin: user                    // App administrators
+    relation moderator: user                // App moderators (can ban/suspend users)
+    relation member: user                   // App members (basic access)
+
+    // Social relationships
+    relation follower: user                 // Users following this app for updates
+    relation subscriber: user               // Users subscribed to notifications from this app
+
+    // Inheritance blocking - when set, parent permissions are NOT inherited
+    // To block inheritance: app:myapp#block_manage_inherit@app:myapp#self
+    relation block_manage_inherit: app#self // Blocks parent->manage inheritance
+    relation block_access_inherit: app#self // Blocks parent->access inheritance
+    relation self: app                      // Self-reference for blocking
+
+    // Computed permissions
+    // manage = direct permissions + (inherited if not blocked)
+    permission inherited_manage = parent->manage - block_manage_inherit->manage
+    permission manage = owner + admin + inherited_manage
+    permission inherited_access = parent->access - block_access_inherit->access
+    permission access = member + admin + owner + inherited_access
+
+    // User management permissions (app-wide)
+    permission ban_user = owner + admin + moderator + parent->ban_user
+    permission suspend_user = owner + admin + moderator + parent->suspend_user
+
+    // Social permissions
+    permission is_follower = follower       // Check if user follows this app
+    permission is_subscriber = subscriber   // Check if user is subscribed
+
+    // View permission - who can see this app in lists
+    // Includes members, admins, owners, and followers/subscribers
+    permission view = access + follower + subscriber
+}
+
+// =============================================================================
+// Tenant - Optional subdivision of an app (for multi-tenant SaaS)
+// =============================================================================
+definition tenant {
+    // Parent relationship (must be app)
+    relation parent: app
+
+    // Direct relationships
+    relation owner: user                    // Tenant owner
+    relation admin: user                    // Tenant administrators
+    relation moderator: user                // Tenant moderators (can ban/suspend users)
+    relation member: user                   // Tenant members
+
+    // Social relationships
+    relation follower: user                 // Users following this tenant for updates
+    relation subscriber: user               // Users subscribed to notifications from this tenant
+
+    // Inheritance blocking - when set, parent permissions are NOT inherited
+    relation block_manage_inherit: tenant#self
+    relation block_access_inherit: tenant#self
+    relation self: tenant
+
+    // Computed permissions
+    permission inherited_manage = parent->manage - block_manage_inherit->manage
+    permission manage = owner + admin + inherited_manage
+    permission inherited_access = parent->access - block_access_inherit->access
+    permission access = member + admin + owner + inherited_access
+
+    // User management permissions (tenant-wide)
+    permission ban_user = owner + admin + moderator + parent->ban_user
+    permission suspend_user = owner + admin + moderator + parent->suspend_user
+
+    // Social permissions
+    permission is_follower = follower       // Check if user follows this tenant
+    permission is_subscriber = subscriber   // Check if user is subscribed
+
+    // View permission - who can see this tenant in lists
+    permission view = access + follower + subscriber
+}
+
+// =============================================================================
+// Node - Generic structural entity (locations, departments, branches, etc.)
+// =============================================================================
+definition node {
+    // Parent relationship (can be app, tenant, or another node)
+    relation parent: app | tenant | node
+
+    // Direct relationships
+    relation owner: user                    // Node owner
+    relation admin: user                    // Node administrators
+    relation moderator: user                // Node moderators (can ban/suspend users)
+    relation member: user                   // Node members
+
+    // Cross-entity viewer (for sharing)
+    relation viewer: user | group | node
+
+    // Social relationships
+    relation follower: user                 // Users following this node for updates
+    relation subscriber: user               // Users subscribed to notifications from this node
+
+    // Inheritance blocking - when set, parent permissions are NOT inherited
+    relation block_manage_inherit: node#self
+    relation block_access_inherit: node#self
+    relation block_view_inherit: node#self
+    relation self: node
+
+    // Computed permissions
+    permission inherited_manage = parent->manage - block_manage_inherit->manage
+    permission manage = owner + admin + inherited_manage
+    permission inherited_access = parent->access - block_access_inherit->access
+    permission access = member + admin + owner + viewer + inherited_access
+    permission inherited_view = parent->view - block_view_inherit->view
+    permission view = viewer + access + inherited_view
+
+    // User management permissions (node-wide)
+    permission ban_user = owner + admin + moderator + parent->ban_user
+    permission suspend_user = owner + admin + moderator + parent->suspend_user
+
+    // Social permissions
+    permission is_follower = follower       // Check if user follows this node
+    permission is_subscriber = subscriber   // Check if user is subscribed
+}
+
+// =============================================================================
+// Group - Logical grouping of users within a node
+// =============================================================================
+definition group {
+    // Parent relationship (must be node)
+    relation parent: node
+
+    // Direct relationships
+    relation member: user                   // Group members
+    relation admin: user                    // Group administrators
+
+    // Computed permissions
+    permission access = member + admin
+    permission manage = admin + parent->manage
+}
+
+// =============================================================================
+// Resource - Permission anchor for protected data or capability
+// =============================================================================
+definition resource {
+    // Parent relationship (must be node)
+    relation parent: node
+
+    // Direct permissions (now supporting relationship#assigned for app-defined roles)
+    relation viewer: user | group#member | group#access | node#member | node#access | relationship#assigned    // Can view
+    relation editor: user | group#member | group#access | node#member | node#access | relationship#assigned    // Can edit
+    relation admin: user | group#member | group#access | node#member | node#access | relationship#assigned     // Full control
+
+    // Social relationships
+    relation subscriber: user               // Users subscribed to updates on this resource
+
+    // Shift-mediated permissions (temporal access)
+    relation allows_view: shift
+    relation allows_edit: shift
+    relation allows_open: shift
+
+    // Computed permissions
+    permission view = viewer + editor + admin + parent->manage
+    permission edit = editor + admin + parent->manage
+    permission manage = admin + parent->manage
+
+    // Social permissions
+    permission is_subscriber = subscriber   // Check if user is subscribed
+}
+
+// =============================================================================
+// Shift - Time-based access controller
+// =============================================================================
+definition shift {
+    // Parent relationship (must be node)
+    relation parent: node
+
+    // Who is assigned to this shift
+    relation assigned: user
+
+    // Which resources this shift enables (bidirectional with resource)
+    relation allows_view: resource
+    relation allows_edit: resource
+    relation allows_open: resource
+
+    // Computed permissions
+    permission manage = parent->manage
+}
+
+// =============================================================================
+// Credential - Vault-backed secret, API key, certificate, or token
+// =============================================================================
+definition credential {
+    // Parent relationship (must be node)
+    relation parent: node
+
+    // Direct permissions (now supporting relationship#assigned for app-defined roles)
+    relation viewer: user | group#member | group#access | node#member | node#access | relationship#assigned    // Can view metadata
+    relation editor: user | group#member | group#access | node#member | node#access | relationship#assigned    // Can rotate/update
+    relation admin: user | group#member | group#access | node#member | node#access | relationship#assigned     // Full control (share, revoke, delete)
+
+    // Shift-mediated permissions
+    relation allows_view: shift
+
+    // Computed permissions
+    permission view = viewer + editor + admin + parent->manage
+    permission edit = editor + admin + parent->manage
+    permission manage = admin + parent->manage
+}
+
+// =============================================================================
+// Channel - Communication channel tied to an entity
+// =============================================================================
+definition channel {
+    // Parent relationship (can be node, group, or app)
+    relation parent: node | group | app
+
+    // Participants
+    relation member: user | group#member | group#access | node#member | node#access    // Can read and post
+    relation moderator: user                // Can moderate messages
+    relation admin: user                    // Full control
+
+    // Computed permissions
+    permission read = member + moderator + admin + parent->access
+    permission post = member + moderator + admin
+    permission moderate = moderator + admin + parent->manage
+    permission manage = admin + parent->manage
+}
+
+// =============================================================================
+// Service - Service identity for service-to-service authorization
+// =============================================================================
+definition service {
+    // Which app this service belongs to
+    relation caller: app
+}
+
+// =============================================================================
+// Message - Individual message in a channel (optional, for fine-grained control)
+// =============================================================================
+definition message {
+    // Parent channel
+    relation channel: channel
+
+    // Message author
+    relation author: user
+
+    // Computed permissions (mostly inherited from channel)
+    permission delete = author + channel->moderate
+    permission edit = author
+    permission react = channel->post
+    permission view = channel->read
+}
+
+// =============================================================================
+// Relationship - App-defined named relationships (roles, positions, etc.)
+// =============================================================================
+definition relationship {
+    // Parent scope (where this relationship is defined)
+    relation parent: node | app | tenant
+
+    // Who has this relationship
+    relation assignee: user | group#member | node#member
+
+    // Hierarchy: another relationship inherits from this one
+    // e.g., tailor is inherited_by supervisor means supervisor has tailor permissions
+    // Stored as: relationship:tailor#inherited_by -> relationship:supervisor#assigned
+    relation inherited_by: relationship#assigned
+
+    // Computed permissions
+    permission assigned = assignee + inherited_by
+    permission manage = parent->manage
+}
+
+// =============================================================================
+// Notification - User or node notification with visibility control
+// =============================================================================
+// Supports three tiers:
+// 1. USER tier: assigned to user, only that user can view
+// 2. ANNOUNCEMENT tier: uses broadcast relation to grant access to all node members
+// 3. SYSTEM tier: assigned to user (admin), visibility grants access to other admins
+//
+// Usage patterns:
+// - User notification:     assigned -> user:alice
+// - Announcement:          assigned -> user:system, broadcast -> node:church#access
+// - System notification:   assigned -> user:admin, visibility -> node:church#admin
+// =============================================================================
+definition notification {
+    // Parent node (organizational context)
+    relation parent: node
+
+    // Who this notification is assigned to
+    // - For user-tier: the actual recipient user
+    // - For announcement/system: use user (e.g., user:system) and use broadcast/visibility
+    // NOTE: node is kept for backwards compatibility but should NOT be used for new notifications
+    //       Using node grants all members access via assigned->access which defeats system-tier
+    relation assigned: user | node
+
+    // Broadcast relation for announcements - grants view access to all members
+    // Use this for announcement-tier notifications that should be visible to all node members
+    // Example: notification:123#broadcast -> node:church#access (all members can view)
+    relation broadcast: node#access | node#member | group#member | group#access
+
+    // Visibility control for additional viewers (explicit grants)
+    // Use this for system-tier notifications that should only be visible to admins
+    // Example: notification:123#visibility -> node:church#admin (only admins can view)
+    relation visibility: user | group#member | node#member | node#admin | relationship#assigned
+
+    // Who can mark this notification as read (beyond the assigned)
+    relation can_mark_read: user | node#admin | relationship#assigned
+
+    // Computed permissions
+    // View: assigned user + broadcast recipients + explicit visibility + parent managers
+    // NOTE: If assigned is a node, assigned->access grants view to all node members (use for announcements only)
+    permission view = assigned + assigned->access + broadcast + visibility + parent->manage
+    // Mark read: assigned user + node admins (when assigned to node) + explicit can_mark_read
+    permission mark_read = assigned + assigned->admin + can_mark_read
+    // Delete: assigned user + parent node managers
+    permission delete = assigned + parent->manage
+}
+
+// =============================================================================
+// Session - User session
+// =============================================================================
+definition session {
+    // User who owns this session
+    relation user: user
+
+    // Computed permissions
+    permission revoke = user
+    permission view = user
+}
+
+// =============================================================================
+// API Key - Service account API key
+// =============================================================================
+definition api_key {
+    // Parent relationship (app-level scoping)
+    relation parent: app
+
+    // Owner who created and primarily controls this key
+    relation owner: user
+
+    // Computed permissions
+    permission use = owner
+    permission view = owner + parent->manage
+    permission revoke = owner + parent->manage
+    permission manage = owner + parent->manage
+}
+
+// =============================================================================
+// Storage Object - Access control for stored files (SeaweedFS/S3)
+// =============================================================================
+// Supports various storage patterns:
+// - Entity logos: Owned by entity admins, readable by members or public
+// - User avatars: Owned by user, readable by connected users or public
+// - Attachments: Scoped to entities with granular permissions
+// - Documents: Full permission model with view/edit/delete
+//
+// Usage patterns:
+// - Personal upload:  parent -> system:system, uploader -> user:alice (user always has access via system)
+// - Org upload:       parent -> app:church, uploader -> user:alice (access via app membership)
+// - Logo:             parent -> app:myapp, public_viewer -> user:* (all can view)
+// - Shared file:      parent -> node:dept, viewer -> user:bob (internal share, requires entity access)
+// - External share:   parent -> node:dept, external_viewer -> user:external (no entity access required)
+//
+// Access control:
+// - Internal shares (viewer/editor/admin) require entity membership (parent->access)
+// - External shares bypass entity membership check
+// - Uploader relation is for attribution only, not permissions
+// - Access flows through parent entity hierarchy
+// =============================================================================
+definition storage_object {
+    // Parent context (organizational scope)
+    relation parent: system | app | tenant | node
+
+    // Uploader of this object - can manage while they have entity access
+    relation uploader: user
+
+    // Internal shares - these are gated by entity membership
+    // User must have parent->access AND be in viewer/editor/admin to access
+    relation viewer: user | group#member | group#access | node#member | node#access | app#member | app#access | relationship#assigned
+    relation editor: user | group#member | group#access | node#member | node#access | app#member | app#access | relationship#assigned
+    relation admin: user | group#member | group#access | node#member | node#access | app#member | app#access | relationship#assigned
+
+    // External shares - these bypass entity membership check
+    // Use for sharing with users outside the organization
+    relation external_viewer: user
+    relation external_editor: user
+
+    // Public access flag - when set, anyone can view (for logos, public avatars)
+    // To make public: storage_object:obj123#public_viewer@user:*
+    relation public_viewer: user:*
+
+    // Computed permissions
+    // - Uploader can view/edit/delete/manage while they have entity access
+    // - Internal shares require entity access (intersection with parent->access)
+    // - External shares bypass entity membership check
+    // - Entity managers (parent->manage) have full access
+    //
+    // NOTE: We use intermediate permissions (internal_*) because SpiceDB's operator
+    // precedence makes & bind tighter than +, so (a + b & c) becomes a + (b & c).
+    // By defining internal_delete = uploader + admin first, we get the correct grouping.
+    permission internal_view = uploader + viewer + editor + admin
+    permission internal_edit = uploader + editor + admin
+    permission internal_delete = uploader + admin
+    permission view = (internal_view & parent->access) + external_viewer + external_editor + public_viewer + parent->manage
+    permission edit = (internal_edit & parent->access) + external_editor + parent->manage
+    permission delete = (internal_delete & parent->access) + parent->manage
+    permission manage = (internal_delete & parent->access) + parent->manage
+}
+
+// =============================================================================
+// Audit Log - Access control for audit logs
+// =============================================================================
+definition audit_log {
+    // Parent context (organizational scope - can be any level of hierarchy)
+    relation parent: system | app | tenant | node
+
+    // For user-scoped audit logs (login attempts, password changes, etc.)
+    // Can be assigned to user OR to an organizational unit at any level
+    relation assigned: user | system | app | tenant | node
+
+    // Visibility controls (who else can view beyond assigned)
+    relation viewer: user | group#member | node#admin | relationship#assigned
+
+    // Export controls (who can download/export for compliance)
+    relation exporter: user | group#member | node#admin | relationship#assigned
+
+    // Annotation controls (who can add comments for investigations)
+    relation annotator: user | node#admin | relationship#assigned
+
+    // Computed permissions
+    // View: assigned user/org, explicit viewers, parent managers
+    permission view = assigned + assigned->access + viewer + parent->manage
+    // Export: explicit exporters, parent managers
+    permission export = exporter + parent->manage
+    // Annotate: explicit annotators, parent managers
+    permission annotate = annotator + parent->manage
+    // Manage: only parent managers
+    permission manage = parent->manage
+}

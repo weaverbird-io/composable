@@ -1,0 +1,20 @@
+{
+  "identities": [
+    {
+      "name": "weaverbird",
+      "credentials": [
+        {
+          "accessKey": "weaverbird_access_key",
+          "secretKey": "weaverbird_secret_key"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    }
+  ]
+}
