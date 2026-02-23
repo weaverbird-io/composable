@@ -120,6 +120,7 @@ jobs:
           python3 << 'EOF'
           import os
           import json
+          import re
           import yaml
 
           def find_compose_files():
@@ -147,15 +148,132 @@ jobs:
                   return None
 
               # Get ports from compose
+              def parse_port_token(token):
+                  if token is None:
+                      return None
+
+                  token = str(token).strip().strip('"').strip("'")
+                  if not token:
+                      return None
+
+                  # Drop protocol suffix, e.g. 51820/udp -> 51820
+                  token = token.split('/', 1)[0]
+
+                  # Plain numeric port
+                  if token.isdigit():
+                      return int(token)
+
+                  # Port range, e.g. 8000-8005 -> 8000
+                  if '-' in token:
+                      start = token.split('-', 1)[0]
+                      if start.isdigit():
+                          return int(start)
+
+                  # Env expression with default, e.g. ${WG_PORT:-51820}
+                  if token.startswith('${') and token.endswith('}'):
+                      inner = token[2:-1]
+                      default = None
+                      if ':-' in inner:
+                          default = inner.split(':-', 1)[1]
+                      elif '-' in inner:
+                          default = inner.split('-', 1)[1]
+                      if default and default.isdigit():
+                          return int(default)
+
+                  # Fallback regex for env/default patterns
+                  match = re.search(r':-([0-9]+)', token)
+                  if match:
+                      return int(match.group(1))
+
+                  return None
+
+              def extract_published_port(port_spec):
+                  def split_outside_context(s):
+                      parts = []
+                      buf = []
+                      env_depth = 0
+                      ipv6_depth = 0
+                      i = 0
+
+                      while i < len(s):
+                          ch = s[i]
+
+                          # Enter ${...} env expression
+                          if ch == '$' and i + 1 < len(s) and s[i + 1] == '{':
+                              env_depth += 1
+                              buf.append(ch)
+                              buf.append('{')
+                              i += 2
+                              continue
+
+                          if ch == '}' and env_depth > 0:
+                              env_depth -= 1
+                              buf.append(ch)
+                              i += 1
+                              continue
+
+                          # Track IPv6 host brackets
+                          if ch == '[':
+                              ipv6_depth += 1
+                              buf.append(ch)
+                              i += 1
+                              continue
+
+                          if ch == ']' and ipv6_depth > 0:
+                              ipv6_depth -= 1
+                              buf.append(ch)
+                              i += 1
+                              continue
+
+                          # Split only on ':' outside env/ipv6 context
+                          if ch == ':' and env_depth == 0 and ipv6_depth == 0:
+                              parts.append(''.join(buf))
+                              buf = []
+                              i += 1
+                              continue
+
+                          buf.append(ch)
+                          i += 1
+
+                      parts.append(''.join(buf))
+                      return parts
+
+                  # Handles short syntax:
+                  # "8080:80", "127.0.0.1:8080:80", "${PORT:-8080}:80", "51820:51820/udp"
+                  spec = str(port_spec).strip()
+                  if not spec:
+                      return None
+
+                  parts = split_outside_context(spec)
+                  if len(parts) == 1:
+                      candidate = parts[0]
+                  elif len(parts) == 2:
+                      candidate = parts[0]
+                  else:
+                      # For host IP + host port + container port, use the second-to-last segment.
+                      candidate = parts[-2]
+
+                  return parse_port_token(candidate)
+
               ports = []
               if 'services' in content:
                   for svc in content['services'].values():
                       if 'ports' in svc:
                           for port in svc['ports']:
-                              if isinstance(port, str) and ':' in port:
-                                  ports.append(int(port.split(':')[0]))
-                              elif isinstance(port, int):
+                              if isinstance(port, int):
                                   ports.append(port)
+                              elif isinstance(port, str):
+                                  parsed = extract_published_port(port)
+                                  if parsed is not None:
+                                      ports.append(parsed)
+                              elif isinstance(port, dict):
+                                  # Long syntax:
+                                  # - target: 80
+                                  #   published: 8080
+                                  published = port.get('published')
+                                  parsed = parse_port_token(published)
+                                  if parsed is not None:
+                                      ports.append(parsed)
 
               # Check for README
               readme_path = os.path.join(os.path.dirname(filepath), 'README.md')
