@@ -125,15 +125,13 @@
     {
       "name": "services-weaverbird-default",
       "path": "services/weaverbird/default",
-      "description": "WeaverBird app stack with nginx API gateway and core services",
+      "description": "WeaverBird app stack with internal nginx API gateway and core services",
       "ports": [],
       "requires": [
         "infrastructure-networks-default",
-        "infrastructure-traefik-default",
         "infrastructure-weaverbird-infra-default"
       ],
       "env_vars": [
-        "WEAVERBIRD_DOMAIN",
         "POSTGRES_HOST",
         "POSTGRES_PORT",
         "POSTGRES_USER",

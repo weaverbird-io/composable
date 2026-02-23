@@ -3,7 +3,7 @@
 Application and gateway services for WeaverBird.
 
 Includes:
-- nginx (single public entrypoint)
+- nginx (internal API gateway)
 - auth-service
 - auth-frontend
 - rebac-service
@@ -21,3 +21,4 @@ docker compose up -d
 ```
 
 This stack expects `infrastructure/weaverbird-infra/default` to be running first.
+No service in this stack is exposed directly to host ports.
