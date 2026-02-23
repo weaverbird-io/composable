@@ -282,12 +282,21 @@ services:
         condition: service_healthy
     networks:
       - infra-private
+      - infra-public
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 10s
       timeout: 5s
       retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.weaverbird.rule=Host(`${WEAVERBIRD_DOMAIN}`)"
+      - "traefik.http.routers.weaverbird.entrypoints=websecure"
+      - "traefik.http.routers.weaverbird.tls.certresolver=letsencrypt"
+      - "traefik.http.services.weaverbird.loadbalancer.server.port=80"
 
 networks:
   infra-private:
+    external: true
+  infra-public:
     external: true

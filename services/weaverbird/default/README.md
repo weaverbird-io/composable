@@ -3,7 +3,7 @@
 Application and gateway services for WeaverBird.
 
 Includes:
-- nginx (internal API gateway)
+- nginx (public entrypoint through existing Traefik)
 - auth-service
 - auth-frontend
 - rebac-service
