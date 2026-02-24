@@ -36,6 +36,32 @@ services:
       retries: 5
       start_period: 10s
 
+  seaweedfs-s3-config:
+    image: alpine:3.19
+    container_name: seaweedfs-s3-config
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cat > /config/s3.json <<TMPL
+        {
+          "identities": [
+            {
+              "name": "${SEAWEEDFS_IDENTITY}",
+              "credentials": [
+                {
+                  "accessKey": "${SEAWEEDFS_ACCESS_KEY}",
+                  "secretKey": "${SEAWEEDFS_SECRET_KEY}"
+                }
+              ],
+              "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+            }
+          ]
+        }
+        TMPL
+    volumes:
+      - seaweedfs_config:/config
+
   seaweedfs-filer:
     image: chrislusf/seaweedfs:latest
     container_name: seaweedfs-filer
@@ -43,12 +69,14 @@ services:
     command: 'filer -master="seaweedfs-master:9333" -ip.bind=0.0.0.0 -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json'
     volumes:
       - seaweedfs_filer_data:/data
-      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+      - seaweedfs_config:/etc/seaweedfs:ro
     depends_on:
       seaweedfs-master:
         condition: service_healthy
       seaweedfs-volume:
         condition: service_healthy
+      seaweedfs-s3-config:
+        condition: service_completed_successfully
     networks:
       - infra-private
     healthcheck:
@@ -66,3 +94,4 @@ volumes:
   seaweedfs_master_data:
   seaweedfs_volume_data:
   seaweedfs_filer_data:
+  seaweedfs_config:

@@ -97,8 +97,8 @@
       "description": "SeaweedFS distributed object storage with S3 API",
       "ports": [],
       "requires": ["infrastructure-networks-default"],
-      "env_vars": [],
-      "files": ["docker-compose.yml", "seaweedfs/s3.json"]
+      "env_vars": ["SEAWEEDFS_IDENTITY", "SEAWEEDFS_ACCESS_KEY", "SEAWEEDFS_SECRET_KEY"],
+      "files": ["docker-compose.yml", ".env.example"]
     }
   ],
   "services": []
