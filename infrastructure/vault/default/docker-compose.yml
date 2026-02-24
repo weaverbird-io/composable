@@ -28,6 +28,7 @@ services:
     command: server
     networks:
       - infra-public
+      - infra-private
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.vault.rule=Host(`${VAULT_DOMAIN}`)"
@@ -37,6 +38,8 @@ services:
 
 networks:
   infra-public:
+    external: true
+  infra-private:
     external: true
 
 volumes:

@@ -12,6 +12,7 @@ services:
       - mailpit_data:/data
     networks:
       - infra-public
+      - infra-private
     labels:
       - "traefik.enable=true"
       # Web UI
@@ -26,6 +27,8 @@ services:
 
 networks:
   infra-public:
+    external: true
+  infra-private:
     external: true
 
 volumes:

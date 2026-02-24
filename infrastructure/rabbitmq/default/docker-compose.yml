@@ -12,6 +12,7 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - infra-public
+      - infra-private
     labels:
       - "traefik.enable=true"
       # Management UI
@@ -23,6 +24,8 @@ services:
 
 networks:
   infra-public:
+    external: true
+  infra-private:
     external: true
 
 volumes:
